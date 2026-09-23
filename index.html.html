@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lead Conversion & Sales Performance Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+:root{
+  --orange:#E8621C; --orange-deep:#C24D0F; --orange-tint:#FDEDE3;
+  --grey-900:#231F1E; --grey-700:#4A433F; --grey-400:#8A817B; --grey-200:#E7E1DA;
+  --white:#FFFFFF; --bg:#FAF7F4; --good:#2E8B57; --bad:#C0392B;
+  --radius:14px;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  box-sizing:border-box;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--grey-900);font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;line-height:1.4}
+h1,h2,h3{font-family:Georgia,'Times New Roman',serif;margin:0}
+.wrap{max-width:1400px;margin:0 auto;padding:20px 24px 60px}
+header.top{background:var(--grey-900);color:var(--white);padding:22px 24px;position:sticky;top:0;z-index:10}
+header.top .head-row{max-width:1400px;margin:0 auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header.top .bar{width:6px;height:34px;background:var(--orange);border-radius:3px}
+header.top h1{font-size:1.5rem;font-weight:700;color:var(--white)}
+header.top p{margin:2px 0 0;color:var(--grey-200);font-size:.85rem;font-family:inherit}
+
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0;align-items:center}
+.filters select{padding:9px 12px;border-radius:9px;border:1px solid var(--grey-200);background:var(--white);color:var(--grey-900);font-size:.88rem;min-width:150px}
+.filters button{padding:9px 16px;border-radius:9px;border:1px solid var(--orange);background:var(--white);color:var(--orange-deep);font-weight:600;font-size:.85rem;cursor:pointer}
+.filters button.primary{background:var(--orange);color:var(--white)}
+.filters .datasrc{margin-left:auto;display:flex;gap:8px}
+.filters input[type=file]{font-size:.8rem}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:8px 0 26px}
+.kpi{background:var(--white);border:1px solid var(--grey-200);border-radius:var(--radius);padding:16px;border-top:4px solid var(--orange)}
+.kpi .lbl{font-size:.72rem;color:var(--grey-400);text-transform:uppercase;letter-spacing:.03em}
+.kpi .num{font-family:Georgia,serif;font-size:1.65rem;color:var(--grey-900);margin-top:4px}
+.kpi .sub{font-size:.78rem;color:var(--orange-deep);font-weight:600;margin-top:2px}
+
+section{background:var(--white);border:1px solid var(--grey-200);border-radius:var(--radius);padding:20px 22px;margin-bottom:20px}
+section h2{font-size:1.1rem;color:var(--grey-900);margin-bottom:14px;padding-left:12px;border-left:4px solid var(--orange)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+
+.funnel{display:flex;flex-direction:column;gap:6px;max-width:760px;margin:0 auto}
+.funnel .stage{display:flex;align-items:center;gap:14px}
+.funnel .fbar{height:38px;background:linear-gradient(90deg,var(--orange),var(--orange-deep));border-radius:8px;display:flex;align-items:center;padding:0 14px;color:#fff;font-weight:600;font-size:.85rem;white-space:nowrap}
+.funnel .flabel{width:130px;font-size:.85rem;color:var(--grey-700);text-align:right;flex-shrink:0}
+.funnel .fmeta{font-size:.75rem;color:var(--grey-400);margin-left:8px}
+.funnel .fconv{text-align:center;font-size:.75rem;color:var(--orange-deep);font-weight:600;margin:2px 0 2px 144px}
+
+table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:6px}
+th{background:var(--grey-900);color:var(--white);text-align:right;padding:8px 10px;font-weight:600}
+th:first-child,td:first-child{text-align:left}
+td{padding:7px 10px;border-bottom:1px solid var(--grey-200);text-align:right}
+tbody tr:hover{background:var(--orange-tint);cursor:pointer}
+.scroll-x{overflow-x:auto}
+.pct-bar{display:inline-block;height:6px;background:var(--orange);border-radius:3px;vertical-align:middle;margin-left:6px}
+
+canvas{max-height:280px}
+.insights ul{margin:0;padding-left:18px;font-size:.88rem;color:var(--grey-700)}
+.insights li{margin-bottom:6px}
+.drill-hint{font-size:.78rem;color:var(--grey-400);margin-bottom:6px}
+.badge{display:inline-block;background:var(--orange-tint);color:var(--orange-deep);border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:600}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){}}
+</style>
+</head>
+<body>
+<header class="top"><div class="head-row">
+  <div class="bar"></div>
+  <div><h1>Lead Conversion & Sales Performance</h1><p>Source · Manager · Counsellor conversion analysis</p></div>
+</div></header>
+
+<div class="wrap">
+  <div class="filters">
+    <select id="fSource"><option value="">All Sources</option></select>
+    <select id="fManager"><option value="">All Managers</option></select>
+    <select id="fCounsellor"><option value="">All Counsellors</option></select>
+    <button id="resetBtn">Reset filters</button>
+    <div class="datasrc">
+      <span id="sheetStatus" style="font-size:.78rem;color:var(--grey-400);align-self:center"></span>
+      <button id="sheetBtn" class="primary">Refresh from Sheet now</button>
+      <button id="sampleBtn">Load sample data</button>
+      <input type="file" id="csvFile" accept=".csv">
+    </div>
+  </div>
+
+  <div class="kpis" id="kpiRow"></div>
+
+  <section>
+    <h2>Lead Conversion Funnel</h2>
+    <div class="funnel" id="funnel"></div>
+  </section>
+
+  <div class="grid2">
+    <section>
+      <h2>Source Performance</h2>
+      <canvas id="sourceChart"></canvas>
+      <div class="scroll-x"><table id="sourceTable"></table></div>
+    </section>
+    <section>
+      <h2>Manager Performance</h2>
+      <div class="drill-hint">Click a manager row to drill into their counsellors below.</div>
+      <canvas id="managerChart"></canvas>
+      <div class="scroll-x"><table id="managerTable"></table></div>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section>
+      <h2>Counsellor Performance <span class="badge" id="counsFilterBadge">All managers</span></h2>
+      <canvas id="counsChart"></canvas>
+      <div class="scroll-x"><table id="counsTable"></table></div>
+    </section>
+    <section>
+      <h2>Lead Status Distribution</h2>
+      <canvas id="statusChart"></canvas>
+    </section>
+  </div>
+
+  <section>
+    <h2>Manager → Counsellor Drill-Down</h2>
+    <div id="drillArea"><p class="drill-hint">Select a manager above, or click a manager row in the table, to see their funnel and counsellor breakdown here.</p></div>
+  </section>
+
+  <section class="insights">
+    <h2>Management Insights</h2>
+    <ul id="insightsList"></ul>
+  </section>
+</div>
+
+<script>
+const COLS = {source:'SOURCE',manager:'MANAGER NAME',counsellor:'COUNSELLOR NAME',
+  leads:'Total Leads',app:'Application Done',cb:'Call Back',drop:'Drop',
+  nc:'Not Connected',ni:'Not Interested',prospect:'Prospect Stage',seat:'Seat Booked'};
+const NUMKEYS=['leads','app','cb','drop','nc','ni','prospect','seat'];
+const SHEET_SOURCE_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRk9YPasfN1GGUNGuJ_uZY7NwVvTZVX0MIkp17BDzmOGVq5Mx8Vcl7n-64cbBGcZiABBfDEDguWKzvj/pub?output=csv';
+const SHEET_SNAPSHOT_TIME='2026-09-23';
+const SHEET_SNAPSHOT=[
+  // Ram's connected "Leads" sheet — refreshed by Claude on request.
+  // Empty as of the last refresh (headers only, no lead rows yet).
+];
+let RAW=[]; let charts={};
+
+function sampleData(){
+  const sources=['Google Ads','Facebook','Referral','Website','Walk-in'];
+  const mgrs=[['Manager A',['Counsellor 1','Counsellor 2','Counsellor 3']],
+              ['Manager B',['Counsellor 4','Counsellor 5']],
+              ['Manager C',['Counsellor 6','Counsellor 7','Counsellor 8']]];
+  let rows=[]; let seed=7;
+  function rnd(n){seed=(seed*9301+49297)%233280; return Math.floor((seed/233280)*n);}
+  mgrs.forEach(([mgr,cs])=>cs.forEach(c=>{
+    sources.forEach(s=>{
+      const leads=20+rnd(60);
+      const app=Math.round(leads*(0.25+rnd(20)/100));
+      const prospect=Math.round(app*(0.35+rnd(25)/100));
+      const seat=Math.round(prospect*(0.2+rnd(20)/100));
+      const cb=Math.round(leads*0.1), drop=Math.round(leads*0.08),
+            nc=Math.round(leads*0.12), ni=Math.round(leads*0.1);
+      rows.push({[COLS.source]:s,[COLS.manager]:mgr,[COLS.counsellor]:c,
+        [COLS.leads]:leads,[COLS.app]:app,[COLS.cb]:cb,[COLS.drop]:drop,
+        [COLS.nc]:nc,[COLS.ni]:ni,[COLS.prospect]:prospect,[COLS.seat]:seat});
+    });
+  }));
+  return rows;
+}
+
+function parseCSV(text){
+  const lines=text.trim().split(/\r?\n/); const headers=lines[0].split(',').map(h=>h.trim());
+  return lines.slice(1).filter(l=>l.trim()).map(l=>{
+    const vals=l.split(','); const o={};
+    headers.forEach((h,i)=>{const v=vals[i]?vals[i].trim():''; o[h]=isNaN(v)||v===''?v:Number(v);});
+    return o;
+  });
+}
+
+function num(r,key){return Number(r[COLS[key]])||0;}
+function pct(a,b){return b>0?(a/b*100):0;}
+function fmtPct(p){return p.toFixed(1)+'%';}
+
+function sumRows(rows){
+  const s={}; NUMKEYS.forEach(k=>s[k]=0);
+  rows.forEach(r=>NUMKEYS.forEach(k=>s[k]+=num(r,k)));
+  return s;
+}
+function groupBy(rows,col){
+  const map={};
+  rows.forEach(r=>{const key=r[COLS[col]]||'Unknown'; (map[key]=map[key]||[]).push(r);});
+  return map;
+}
+function populateSelect(sel,values,current){
+  sel.querySelectorAll('option:not(:first-child)').forEach(o=>o.remove());
+  [...new Set(values)].sort().forEach(v=>{
+    const o=document.createElement('option'); o.value=v; o.textContent=v;
+    if(v===current) o.selected=true;
+    sel.appendChild(o);
+  });
+}
+
+function applyFilters(){
+  const src=document.getElementById('fSource').value;
+  const mgr=document.getElementById('fManager').value;
+  const cns=document.getElementById('fCounsellor').value;
+  return RAW.filter(r=>(!src||r[COLS.source]===src)&&(!mgr||r[COLS.manager]===mgr)&&(!cns||r[COLS.counsellor]===cns));
+}
+
+function destroy(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+function barChart(id,labels,datasets,horizontal){
+  destroy(id);
+  charts[id]=new Chart(document.getElementById(id),{type:'bar',
+    data:{labels,datasets},
+    options:{indexAxis:horizontal?'y':'x',responsive:true,
+      plugins:{legend:{display:datasets.length>1,labels:{font:{size:11}}}},
+      scales:{x:{ticks:{font:{size:10}}},y:{ticks:{font:{size:10}}}}}});
+}
+function donutChart(id,labels,data){
+  destroy(id);
+  charts[id]=new Chart(document.getElementById(id),{type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:['#E8621C','#C24D0F','#8A817B','#4A433F','#F2A26B','#E7E1DA','#231F1E']}]},
+    options:{plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}});
+}
+
+function render(){
+  const filtered=applyFilters();
+  const t=sumRows(filtered);
+
+  // filters dropdowns
+  populateSelect(document.getElementById('fSource'),RAW.map(r=>r[COLS.source]),document.getElementById('fSource').value);
+  populateSelect(document.getElementById('fManager'),RAW.map(r=>r[COLS.manager]),document.getElementById('fManager').value);
+  const cCol=document.getElementById('fManager').value?filtered:RAW;
+  populateSelect(document.getElementById('fCounsellor'),cCol.map(r=>r[COLS.counsellor]),document.getElementById('fCounsellor').value);
+
+  // KPIs
+  const kpiRow=document.getElementById('kpiRow');
+  const kpis=[
+    ['Total Leads',t.leads,''],
+    ['Applications',t.app,fmtPct(pct(t.app,t.leads))+' of leads'],
+    ['App Conversion',fmtPct(pct(t.app,t.leads)),''],
+    ['Prospects',t.prospect,fmtPct(pct(t.prospect,t.leads))+' of leads'],
+    ['Prospect Conversion',fmtPct(pct(t.prospect,t.leads)),''],
+    ['Seat Bookings',t.seat,fmtPct(pct(t.seat,t.leads))+' of leads'],
+    ['Seat Booking Rate',fmtPct(pct(t.seat,t.prospect)),'of prospects'],
+    ['Lead → Seat',fmtPct(pct(t.seat,t.leads)),'overall'],
+  ];
+  kpiRow.innerHTML=kpis.map(k=>`<div class="kpi"><div class="lbl">${k[0]}</div><div class="num">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');
+
+  // Funnel
+  const stages=[['Total Leads',t.leads],['Application Done',t.app],['Prospect Stage',t.prospect],['Seat Booked',t.seat]];
+  const max=stages[0][1]||1;
+  let fh='';
+  stages.forEach((s,i)=>{
+    const w=Math.max(8,(s[1]/max*100));
+    fh+=`<div class="stage"><div class="flabel">${s[0]}</div><div class="fbar" style="width:${w}%">${s[1]} · ${fmtPct(pct(s[1],t.leads))}</div></div>`;
+    if(i<stages.length-1){
+      const conv=pct(stages[i+1][1],s[1]);
+      fh+=`<div class="fconv">↓ stage conversion: ${fmtPct(conv)}</div>`;
+    }
+  });
+  document.getElementById('funnel').innerHTML=fh;
+
+  // Source
+  const bySrc=groupBy(filtered,'source');
+  const srcKeys=Object.keys(bySrc);
+  const srcSums=srcKeys.map(k=>sumRows(bySrc[k]));
+  barChart('sourceChart',srcKeys,[{label:'Total Leads',data:srcSums.map(s=>s.leads),backgroundColor:'#E8621C'}],true);
+  document.getElementById('sourceTable').innerHTML=
+    '<tr><th>Source</th><th>Leads</th><th>App %</th><th>Prospect %</th><th>Seat %</th></tr>'+
+    srcKeys.map((k,i)=>{const s=srcSums[i];return `<tr><td>${k}</td><td>${s.leads}</td><td>${fmtPct(pct(s.app,s.leads))}</td><td>${fmtPct(pct(s.prospect,s.leads))}</td><td>${fmtPct(pct(s.seat,s.leads))}</td></tr>`;}).join('');
+
+  // Manager
+  const byMgr=groupBy(filtered,'manager');
+  const mgrKeys=Object.keys(byMgr);
+  const mgrSums=mgrKeys.map(k=>sumRows(byMgr[k]));
+  barChart('managerChart',mgrKeys,[
+    {label:'App %',data:mgrSums.map(s=>pct(s.app,s.leads).toFixed(1)),backgroundColor:'#E8621C'},
+    {label:'Prospect %',data:mgrSums.map(s=>pct(s.prospect,s.leads).toFixed(1)),backgroundColor:'#8A817B'},
+    {label:'Seat %',data:mgrSums.map(s=>pct(s.seat,s.leads).toFixed(1)),backgroundColor:'#231F1E'}
+  ],false);
+  const mgrTable=document.getElementById('managerTable');
+  mgrTable.innerHTML='<tr><th>Manager</th><th>Leads</th><th>App</th><th>App %</th><th>Prospect</th><th>Prospect %</th><th>Seat</th><th>Seat %</th></tr>'+
+    mgrKeys.map((k,i)=>{const s=mgrSums[i];return `<tr data-mgr="${k}"><td>${k}</td><td>${s.leads}</td><td>${s.app}</td><td>${fmtPct(pct(s.app,s.leads))}</td><td>${s.prospect}</td><td>${fmtPct(pct(s.prospect,s.leads))}</td><td>${s.seat}</td><td>${fmtPct(pct(s.seat,s.leads))}</td></tr>`;}).join('');
+  mgrTable.querySelectorAll('tr[data-mgr]').forEach(tr=>tr.addEventListener('click',()=>{
+    document.getElementById('fManager').value=tr.dataset.mgr;
+    document.getElementById('fCounsellor').value='';
+    render(); drillManager(tr.dataset.mgr);
+  }));
+
+  // Counsellor (respects manager filter)
+  const activeMgr=document.getElementById('fManager').value;
+  document.getElementById('counsFilterBadge').textContent=activeMgr||'All managers';
+  const byCns=groupBy(filtered,'counsellor');
+  const cnsKeys=Object.keys(byCns);
+  const cnsSums=cnsKeys.map(k=>sumRows(byCns[k]));
+  barChart('counsChart',cnsKeys,[{label:'Leads',data:cnsSums.map(s=>s.leads),backgroundColor:'#E8621C'}],true);
+  document.getElementById('counsTable').innerHTML=
+    '<tr><th>Counsellor</th><th>Leads</th><th>App %</th><th>CB %</th><th>Drop %</th><th>NC %</th><th>NI %</th><th>Prospect %</th><th>Seat %</th></tr>'+
+    cnsKeys.map((k,i)=>{const s=cnsSums[i];return `<tr><td>${k}</td><td>${s.leads}</td><td>${fmtPct(pct(s.app,s.leads))}</td><td>${fmtPct(pct(s.cb,s.leads))}</td><td>${fmtPct(pct(s.drop,s.leads))}</td><td>${fmtPct(pct(s.nc,s.leads))}</td><td>${fmtPct(pct(s.ni,s.leads))}</td><td>${fmtPct(pct(s.prospect,s.leads))}</td><td>${fmtPct(pct(s.seat,s.leads))}</td></tr>`;}).join('');
+
+  // Status donut
+  donutChart('statusChart',
+    ['Application Done','Call Back','Drop','Not Connected','Not Interested','Prospect Stage','Seat Booked'],
+    [t.app,t.cb,t.drop,t.nc,t.ni,t.prospect,t.seat]);
+
+  // Insights
+  const insights=[
+    `Total leads in current filter: ${t.leads}.`,
+    `Application conversion: ${fmtPct(pct(t.app,t.leads))} (${t.app} of ${t.leads} leads).`,
+    `Prospect conversion: ${fmtPct(pct(t.prospect,t.leads))} of total leads.`,
+    `Seat booking conversion: ${fmtPct(pct(t.seat,t.leads))} of total leads (${t.seat} seats).`,
+    `Not connected: ${fmtPct(pct(t.nc,t.leads))} of leads. Not interested: ${fmtPct(pct(t.ni,t.leads))}. Dropped: ${fmtPct(pct(t.drop,t.leads))}.`,
+  ];
+  mgrKeys.forEach((k,i)=>{const s=mgrSums[i]; insights.push(`${k}: ${s.leads} leads, ${fmtPct(pct(s.seat,s.leads))} lead-to-seat conversion.`);});
+  srcKeys.forEach((k,i)=>{const s=srcSums[i]; insights.push(`${k} source: ${s.leads} leads, ${fmtPct(pct(s.app,s.leads))} application conversion.`);});
+  document.getElementById('insightsList').innerHTML=insights.map(i=>`<li>${i}</li>`).join('');
+
+  if(activeMgr) drillManager(activeMgr); else document.getElementById('drillArea').innerHTML='<p class="drill-hint">Select a manager above, or click a manager row in the table, to see their funnel and counsellor breakdown here.</p>';
+}
+
+function drillManager(mgr){
+  const rows=RAW.filter(r=>r[COLS.manager]===mgr);
+  const s=sumRows(rows);
+  const byCns=groupBy(rows,'counsellor');
+  const rowsHtml=Object.keys(byCns).map(c=>{
+    const cs=sumRows(byCns[c]);
+    return `<tr><td>${c}</td><td>${cs.leads}</td><td>${cs.app}</td><td>${fmtPct(pct(cs.app,cs.leads))}</td><td>${cs.prospect}</td><td>${fmtPct(pct(cs.prospect,cs.leads))}</td><td>${cs.seat}</td><td>${fmtPct(pct(cs.seat,cs.leads))}</td></tr>`;
+  }).join('');
+  document.getElementById('drillArea').innerHTML=`
+    <h3 style="font-size:1rem;margin-bottom:8px">${mgr} — ${s.leads} leads → ${s.app} app (${fmtPct(pct(s.app,s.leads))}) → ${s.prospect} prospect (${fmtPct(pct(s.prospect,s.app))} of app) → ${s.seat} seats (${fmtPct(pct(s.seat,s.prospect))} of prospect)</h3>
+    <div class="scroll-x"><table><tr><th>Counsellor</th><th>Leads</th><th>App</th><th>App %</th><th>Prospect</th><th>Prospect %</th><th>Seat</th><th>Seat %</th></tr>${rowsHtml}</table></div>`;
+}
+
+function isRawLeads(rows){
+  if(!rows.length) return false;
+  const keys=Object.keys(rows[0]).map(k=>k.trim().toLowerCase());
+  return keys.includes('status') && !keys.includes('total leads');
+}
+function aggregateRawLeads(rows){
+  const find=(obj,name)=>{const k=Object.keys(obj).find(k=>k.trim().toLowerCase()===name); return k?obj[k]:'';};
+  const groups={};
+  rows.forEach(r=>{
+    const source=String(find(r,'source')||'Unknown').trim();
+    const manager=String(find(r,'manager name')||'Unknown').trim();
+    const counsellor=String(find(r,'counsellor name')||'Unknown').trim();
+    const status=String(find(r,'status')||'').trim();
+    const key=source+'||'+manager+'||'+counsellor;
+    if(!groups[key]){
+      groups[key]={[COLS.source]:source,[COLS.manager]:manager,[COLS.counsellor]:counsellor,[COLS.leads]:0};
+      NUMKEYS.filter(k=>k!=='leads').forEach(k=>groups[key][COLS[k]]=0);
+    }
+    groups[key][COLS.leads]+=1;
+    const statusKey=Object.keys(COLS).find(k=>COLS[k].toLowerCase()===status.toLowerCase());
+    if(statusKey && statusKey!=='leads' && statusKey!=='source' && statusKey!=='manager' && statusKey!=='counsellor'){
+      groups[key][COLS[statusKey]]+=1;
+    }
+  });
+  return Object.values(groups);
+}
+function loadData(rows){
+  if(isRawLeads(rows)) rows=aggregateRawLeads(rows);
+  RAW=rows;
+  document.getElementById('fSource').value='';document.getElementById('fManager').value='';document.getElementById('fCounsellor').value='';
+  render();
+}
+
+document.getElementById('fSource').addEventListener('change',render);
+document.getElementById('fManager').addEventListener('change',()=>{document.getElementById('fCounsellor').value='';render();});
+document.getElementById('fCounsellor').addEventListener('change',render);
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  document.getElementById('fSource').value='';document.getElementById('fManager').value='';document.getElementById('fCounsellor').value='';render();
+});
+document.getElementById('sampleBtn').addEventListener('click',()=>loadData(sampleData()));
+
+async function fetchSheetLive(silent){
+  try{
+    const res=await fetch(SHEET_SOURCE_URL+'&_ts='+Date.now(),{cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const text=await res.text();
+    const rows=parseCSV(text);
+    loadData(rows);
+    document.getElementById('sheetStatus').textContent='Live — last updated '+new Date().toLocaleTimeString()+' ('+rows.length+' rows)';
+    return true;
+  }catch(err){
+    if(!silent) document.getElementById('sheetStatus').textContent='Could not reach the Sheet (offline snapshot shown). '+err.message;
+    return false;
+  }
+}
+document.getElementById('sheetBtn').addEventListener('click',()=>fetchSheetLive(false));
+setInterval(()=>fetchSheetLive(true),60000); // auto-refresh every 60s
+document.getElementById('csvFile').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{try{loadData(parseCSV(ev.target.result));}catch(err){alert('Could not parse CSV: '+err.message);}};
+  reader.readAsText(f);
+});
+
+loadData(SHEET_SNAPSHOT.length?SHEET_SNAPSHOT.slice():sampleData());
+fetchSheetLive(true);
+</script>
+</body>
+</html>
