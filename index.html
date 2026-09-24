@@ -131,17 +131,19 @@ canvas{max-height:280px}
 </div>
 
 <script>
-const COLS = {source:'SOURCE',manager:'MANAGER NAME',counsellor:'COUNSELLOR NAME',
-  leads:'Total Leads',app:'Application Done',cb:'Call Back',drop:'Drop',
-  nc:'Not Connected',ni:'Not Interested',prospect:'Prospect Stage',seat:'Seat Booked'};
-const NUMKEYS=['leads','app','cb','drop','nc','ni','prospect','seat'];
+const COLS = {source:'SOURCE',manager:'MANAGER NAME',counsellor:'COUNSELLOR NAME',leads:'Total Leads'};
+const CORE_STATUSES = ['Application Done','Prospect Stage','Enrollment','Call Back','Not Connected','Not Interested','Drop'];
 const SHEET_SOURCE_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRk9YPasfN1GGUNGuJ_uZY7NwVvTZVX0MIkp17BDzmOGVq5Mx8Vcl7n-64cbBGcZiABBfDEDguWKzvj/pub?output=csv';
 const SHEET_SNAPSHOT_TIME='2026-09-23';
 const SHEET_SNAPSHOT=[
-  // Ram's connected "Leads" sheet — refreshed by Claude on request.
+  // Ram's connected "Leads" sheet — refreshed by Claude on request or by the live fetch below.
   // Empty as of the last refresh (headers only, no lead rows yet).
 ];
-let RAW=[]; let charts={};
+let RAW=[]; let STATUS_LIST=[]; let charts={};
+
+// ---- Data model: RAW is an array of group objects:
+// { source, manager, counsellor, total, statuses:{ <any status string>: count } }
+// Any manager/counsellor/status value found in the sheet is accepted as-is — nothing hardcoded.
 
 function sampleData(){
   const sources=['Google Ads','Facebook','Referral','Website','Walk-in'];
@@ -155,12 +157,19 @@ function sampleData(){
       const leads=20+rnd(60);
       const app=Math.round(leads*(0.25+rnd(20)/100));
       const prospect=Math.round(app*(0.35+rnd(25)/100));
-      const seat=Math.round(prospect*(0.2+rnd(20)/100));
+      const enroll=Math.round(prospect*(0.2+rnd(20)/100));
       const cb=Math.round(leads*0.1), drop=Math.round(leads*0.08),
             nc=Math.round(leads*0.12), ni=Math.round(leads*0.1);
-      rows.push({[COLS.source]:s,[COLS.manager]:mgr,[COLS.counsellor]:c,
-        [COLS.leads]:leads,[COLS.app]:app,[COLS.cb]:cb,[COLS.drop]:drop,
-        [COLS.nc]:nc,[COLS.ni]:ni,[COLS.prospect]:prospect,[COLS.seat]:seat});
+      const counts={'Application Done':app-prospect,'Call Back':cb,'Drop':drop,'Not Connected':nc,
+        'Not Interested':ni,'Prospect Stage':prospect-enroll,'Enrollment':enroll};
+      let placed=0;
+      Object.keys(counts).forEach(status=>{
+        for(let i=0;i<Math.max(0,counts[status]);i++){
+          rows.push({Source:s,'Manager Name':mgr,'Counsellor Name':c,Status:status});
+          placed++;
+        }
+      });
+      for(let i=placed;i<leads;i++) rows.push({Source:s,'Manager Name':mgr,'Counsellor Name':c,Status:'Unspecified'});
     });
   }));
   return rows;
@@ -170,24 +179,83 @@ function parseCSV(text){
   const lines=text.trim().split(/\r?\n/); const headers=lines[0].split(',').map(h=>h.trim());
   return lines.slice(1).filter(l=>l.trim()).map(l=>{
     const vals=l.split(','); const o={};
-    headers.forEach((h,i)=>{const v=vals[i]?vals[i].trim():''; o[h]=isNaN(v)||v===''?v:Number(v);});
+    headers.forEach((h,i)=>{o[h]=vals[i]!==undefined?vals[i].trim():'';});
     return o;
   });
 }
 
-function num(r,key){return Number(r[COLS[key]])||0;}
 function pct(a,b){return b>0?(a/b*100):0;}
 function fmtPct(p){return p.toFixed(1)+'%';}
+function statusCount(t,name){return (t.statuses&&t.statuses[name])||0;}
 
-function sumRows(rows){
-  const s={}; NUMKEYS.forEach(k=>s[k]=0);
-  rows.forEach(r=>NUMKEYS.forEach(k=>s[k]+=num(r,k)));
-  return s;
+// Turn any uploaded/fetched rows (raw lead-level, OR the old fixed-column
+// aggregated format) into the group model above. No status or manager name
+// is ever filtered out — whatever appears in the sheet is kept and shown.
+function toGroups(rows){
+  if(!rows.length) return [];
+  const keys=Object.keys(rows[0]).map(k=>k.trim().toLowerCase());
+  const find=(obj,name)=>{const k=Object.keys(obj).find(k=>k.trim().toLowerCase()===name); return k!==undefined?obj[k]:'';};
+  const groups={};
+  const isRaw = keys.includes('status') && !keys.includes('total leads');
+
+  if(isRaw){
+    rows.forEach(r=>{
+      const source=String(find(r,'source')||'Unknown').trim()||'Unknown';
+      const manager=String(find(r,'manager name')||'Unknown').trim()||'Unknown';
+      const counsellor=String(find(r,'counsellor name')||'Unknown').trim()||'Unknown';
+      let status=String(find(r,'status')||'').trim();
+      if(!status) status='Unspecified';
+      const key=source+'||'+manager+'||'+counsellor;
+      if(!groups[key]) groups[key]={source,manager,counsellor,total:0,statuses:{}};
+      groups[key].total+=1;
+      groups[key].statuses[status]=(groups[key].statuses[status]||0)+1;
+    });
+  } else {
+    // old fixed-column aggregated format (SOURCE, MANAGER NAME, COUNSELLOR NAME, Total Leads, <status columns>...)
+    const fixedCols=['source','manager name','counsellor name','total leads'];
+    rows.forEach(r=>{
+      const source=String(find(r,'source')||'Unknown').trim()||'Unknown';
+      const manager=String(find(r,'manager name')||'Unknown').trim()||'Unknown';
+      const counsellor=String(find(r,'counsellor name')||'Unknown').trim()||'Unknown';
+      const total=Number(find(r,'total leads'))||0;
+      const statuses={};
+      Object.keys(r).forEach(h=>{
+        const hl=h.trim().toLowerCase();
+        if(!fixedCols.includes(hl)){
+          const label = hl==='seat booked' ? 'Enrollment' : h.trim();
+          const v=Number(r[h])||0;
+          if(v) statuses[label]=(statuses[label]||0)+v;
+        }
+      });
+      const known=Object.values(statuses).reduce((a,b)=>a+b,0);
+      if(total>known) statuses['Unspecified']=(statuses['Unspecified']||0)+(total-known);
+      const key=source+'||'+manager+'||'+counsellor;
+      groups[key]={source,manager,counsellor,total,statuses};
+    });
+  }
+  return Object.values(groups);
 }
-function groupBy(rows,col){
+
+function mergeGroups(list){
+  const out={total:0,statuses:{}};
+  list.forEach(g=>{
+    out.total+=g.total;
+    Object.keys(g.statuses).forEach(k=>{out.statuses[k]=(out.statuses[k]||0)+g.statuses[k];});
+  });
+  return out;
+}
+function groupByField(list,field){
   const map={};
-  rows.forEach(r=>{const key=r[COLS[col]]||'Unknown'; (map[key]=map[key]||[]).push(r);});
+  list.forEach(g=>{const key=g[field]||'Unknown'; (map[key]=map[key]||[]).push(g);});
   return map;
+}
+function computeStatusList(list){
+  const seen=new Set();
+  list.forEach(g=>Object.keys(g.statuses).forEach(k=>seen.add(k)));
+  const core=CORE_STATUSES.filter(s=>seen.has(s));
+  const extra=[...seen].filter(s=>!CORE_STATUSES.includes(s)&&s!=='Unspecified').sort();
+  const rest=seen.has('Unspecified')?['Unspecified']:[];
+  return [...core,...extra,...rest];
 }
 function populateSelect(sel,values,current){
   sel.querySelectorAll('option:not(:first-child)').forEach(o=>o.remove());
@@ -202,7 +270,7 @@ function applyFilters(){
   const src=document.getElementById('fSource').value;
   const mgr=document.getElementById('fManager').value;
   const cns=document.getElementById('fCounsellor').value;
-  return RAW.filter(r=>(!src||r[COLS.source]===src)&&(!mgr||r[COLS.manager]===mgr)&&(!cns||r[COLS.counsellor]===cns));
+  return RAW.filter(g=>(!src||g.source===src)&&(!mgr||g.manager===mgr)&&(!cns||g.counsellor===cns));
 }
 
 function destroy(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
@@ -217,149 +285,129 @@ function barChart(id,labels,datasets,horizontal){
 }
 function donutChart(id,labels,data){
   destroy(id);
+  const palette=['#E8621C','#C24D0F','#8A817B','#4A433F','#F2A26B','#E7E1DA','#231F1E','#D98E5C','#B5AFA9','#7A5236'];
   charts[id]=new Chart(document.getElementById(id),{type:'doughnut',
-    data:{labels,datasets:[{data,backgroundColor:['#E8621C','#C24D0F','#8A817B','#4A433F','#F2A26B','#E7E1DA','#231F1E']}]},
+    data:{labels,datasets:[{data,backgroundColor:labels.map((_,i)=>palette[i%palette.length])}]},
     options:{plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}});
 }
 
+function statusTableRow(name,leads,statuses){
+  const cells=STATUS_LIST.map(s=>`<td>${fmtPct(pct(statuses[s]||0,leads))}</td>`).join('');
+  return `<tr><td>${name}</td><td>${leads}</td>${cells}</tr>`;
+}
+function statusTableHeader(){
+  return '<th>Leads</th>'+STATUS_LIST.map(s=>`<th>${s} %</th>`).join('');
+}
+
 function render(){
+  STATUS_LIST=computeStatusList(RAW);
   const filtered=applyFilters();
-  const t=sumRows(filtered);
+  const t=mergeGroups(filtered);
 
-  // filters dropdowns
-  populateSelect(document.getElementById('fSource'),RAW.map(r=>r[COLS.source]),document.getElementById('fSource').value);
-  populateSelect(document.getElementById('fManager'),RAW.map(r=>r[COLS.manager]),document.getElementById('fManager').value);
+  populateSelect(document.getElementById('fSource'),RAW.map(g=>g.source),document.getElementById('fSource').value);
+  populateSelect(document.getElementById('fManager'),RAW.map(g=>g.manager),document.getElementById('fManager').value);
   const cCol=document.getElementById('fManager').value?filtered:RAW;
-  populateSelect(document.getElementById('fCounsellor'),cCol.map(r=>r[COLS.counsellor]),document.getElementById('fCounsellor').value);
+  populateSelect(document.getElementById('fCounsellor'),cCol.map(g=>g.counsellor),document.getElementById('fCounsellor').value);
 
-  // KPIs
-  const kpiRow=document.getElementById('kpiRow');
+  const app=statusCount(t,'Application Done'), prospect=statusCount(t,'Prospect Stage'), enroll=statusCount(t,'Enrollment');
   const kpis=[
-    ['Total Leads',t.leads,''],
-    ['Applications',t.app,fmtPct(pct(t.app,t.leads))+' of leads'],
-    ['App Conversion',fmtPct(pct(t.app,t.leads)),''],
-    ['Prospects',t.prospect,fmtPct(pct(t.prospect,t.leads))+' of leads'],
-    ['Prospect Conversion',fmtPct(pct(t.prospect,t.leads)),''],
-    ['Seat Bookings',t.seat,fmtPct(pct(t.seat,t.leads))+' of leads'],
-    ['Seat Booking Rate',fmtPct(pct(t.seat,t.prospect)),'of prospects'],
-    ['Lead → Seat',fmtPct(pct(t.seat,t.leads)),'overall'],
+    ['Total Leads',t.total,''],
+    ['Applications',app,fmtPct(pct(app,t.total))+' of leads'],
+    ['App Conversion',fmtPct(pct(app,t.total)),''],
+    ['Prospects',prospect,fmtPct(pct(prospect,t.total))+' of leads'],
+    ['Prospect Conversion',fmtPct(pct(prospect,t.total)),''],
+    ['Enrollments',enroll,fmtPct(pct(enroll,t.total))+' of leads'],
+    ['Enrollment Rate',fmtPct(pct(enroll,prospect)),'of prospects'],
+    ['Lead → Enrollment',fmtPct(pct(enroll,t.total)),'overall'],
   ];
-  kpiRow.innerHTML=kpis.map(k=>`<div class="kpi"><div class="lbl">${k[0]}</div><div class="num">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');
+  document.getElementById('kpiRow').innerHTML=kpis.map(k=>`<div class="kpi"><div class="lbl">${k[0]}</div><div class="num">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');
 
-  // Funnel
-  const stages=[['Total Leads',t.leads],['Application Done',t.app],['Prospect Stage',t.prospect],['Seat Booked',t.seat]];
+  const stages=[['Total Leads',t.total],['Application Done',app],['Prospect Stage',prospect],['Enrollment',enroll]];
   const max=stages[0][1]||1;
   let fh='';
   stages.forEach((s,i)=>{
     const w=Math.max(8,(s[1]/max*100));
-    fh+=`<div class="stage"><div class="flabel">${s[0]}</div><div class="fbar" style="width:${w}%">${s[1]} · ${fmtPct(pct(s[1],t.leads))}</div></div>`;
+    fh+=`<div class="stage"><div class="flabel">${s[0]}</div><div class="fbar" style="width:${w}%">${s[1]} · ${fmtPct(pct(s[1],t.total))}</div></div>`;
     if(i<stages.length-1){
-      const conv=pct(stages[i+1][1],s[1]);
-      fh+=`<div class="fconv">↓ stage conversion: ${fmtPct(conv)}</div>`;
+      fh+=`<div class="fconv">↓ stage conversion: ${fmtPct(pct(stages[i+1][1],s[1]))}</div>`;
     }
   });
   document.getElementById('funnel').innerHTML=fh;
 
   // Source
-  const bySrc=groupBy(filtered,'source');
+  const bySrc=groupByField(filtered,'source');
   const srcKeys=Object.keys(bySrc);
-  const srcSums=srcKeys.map(k=>sumRows(bySrc[k]));
-  barChart('sourceChart',srcKeys,[{label:'Total Leads',data:srcSums.map(s=>s.leads),backgroundColor:'#E8621C'}],true);
+  const srcSums=srcKeys.map(k=>mergeGroups(bySrc[k]));
+  barChart('sourceChart',srcKeys,[{label:'Total Leads',data:srcSums.map(s=>s.total),backgroundColor:'#E8621C'}],true);
   document.getElementById('sourceTable').innerHTML=
-    '<tr><th>Source</th><th>Leads</th><th>App %</th><th>Prospect %</th><th>Seat %</th></tr>'+
-    srcKeys.map((k,i)=>{const s=srcSums[i];return `<tr><td>${k}</td><td>${s.leads}</td><td>${fmtPct(pct(s.app,s.leads))}</td><td>${fmtPct(pct(s.prospect,s.leads))}</td><td>${fmtPct(pct(s.seat,s.leads))}</td></tr>`;}).join('');
+    '<tr><th>Source</th>'+statusTableHeader()+'</tr>'+
+    srcKeys.map((k,i)=>statusTableRow(k,srcSums[i].total,srcSums[i].statuses)).join('');
 
   // Manager
-  const byMgr=groupBy(filtered,'manager');
+  const byMgr=groupByField(filtered,'manager');
   const mgrKeys=Object.keys(byMgr);
-  const mgrSums=mgrKeys.map(k=>sumRows(byMgr[k]));
+  const mgrSums=mgrKeys.map(k=>mergeGroups(byMgr[k]));
   barChart('managerChart',mgrKeys,[
-    {label:'App %',data:mgrSums.map(s=>pct(s.app,s.leads).toFixed(1)),backgroundColor:'#E8621C'},
-    {label:'Prospect %',data:mgrSums.map(s=>pct(s.prospect,s.leads).toFixed(1)),backgroundColor:'#8A817B'},
-    {label:'Seat %',data:mgrSums.map(s=>pct(s.seat,s.leads).toFixed(1)),backgroundColor:'#231F1E'}
+    {label:'App %',data:mgrSums.map(s=>pct(statusCount(s,'Application Done'),s.total).toFixed(1)),backgroundColor:'#E8621C'},
+    {label:'Prospect %',data:mgrSums.map(s=>pct(statusCount(s,'Prospect Stage'),s.total).toFixed(1)),backgroundColor:'#8A817B'},
+    {label:'Enrollment %',data:mgrSums.map(s=>pct(statusCount(s,'Enrollment'),s.total).toFixed(1)),backgroundColor:'#231F1E'}
   ],false);
   const mgrTable=document.getElementById('managerTable');
-  mgrTable.innerHTML='<tr><th>Manager</th><th>Leads</th><th>App</th><th>App %</th><th>Prospect</th><th>Prospect %</th><th>Seat</th><th>Seat %</th></tr>'+
-    mgrKeys.map((k,i)=>{const s=mgrSums[i];return `<tr data-mgr="${k}"><td>${k}</td><td>${s.leads}</td><td>${s.app}</td><td>${fmtPct(pct(s.app,s.leads))}</td><td>${s.prospect}</td><td>${fmtPct(pct(s.prospect,s.leads))}</td><td>${s.seat}</td><td>${fmtPct(pct(s.seat,s.leads))}</td></tr>`;}).join('');
+  mgrTable.innerHTML='<tr><th>Manager</th>'+statusTableHeader()+'</tr>'+
+    mgrKeys.map((k,i)=>`<tr data-mgr="${k}">${statusTableRow(k,mgrSums[i].total,mgrSums[i].statuses).slice(4)}`).join('');
   mgrTable.querySelectorAll('tr[data-mgr]').forEach(tr=>tr.addEventListener('click',()=>{
     document.getElementById('fManager').value=tr.dataset.mgr;
     document.getElementById('fCounsellor').value='';
     render(); drillManager(tr.dataset.mgr);
   }));
 
-  // Counsellor (respects manager filter)
+  // Counsellor
   const activeMgr=document.getElementById('fManager').value;
   document.getElementById('counsFilterBadge').textContent=activeMgr||'All managers';
-  const byCns=groupBy(filtered,'counsellor');
+  const byCns=groupByField(filtered,'counsellor');
   const cnsKeys=Object.keys(byCns);
-  const cnsSums=cnsKeys.map(k=>sumRows(byCns[k]));
-  barChart('counsChart',cnsKeys,[{label:'Leads',data:cnsSums.map(s=>s.leads),backgroundColor:'#E8621C'}],true);
+  const cnsSums=cnsKeys.map(k=>mergeGroups(byCns[k]));
+  barChart('counsChart',cnsKeys,[{label:'Leads',data:cnsSums.map(s=>s.total),backgroundColor:'#E8621C'}],true);
   document.getElementById('counsTable').innerHTML=
-    '<tr><th>Counsellor</th><th>Leads</th><th>App %</th><th>CB %</th><th>Drop %</th><th>NC %</th><th>NI %</th><th>Prospect %</th><th>Seat %</th></tr>'+
-    cnsKeys.map((k,i)=>{const s=cnsSums[i];return `<tr><td>${k}</td><td>${s.leads}</td><td>${fmtPct(pct(s.app,s.leads))}</td><td>${fmtPct(pct(s.cb,s.leads))}</td><td>${fmtPct(pct(s.drop,s.leads))}</td><td>${fmtPct(pct(s.nc,s.leads))}</td><td>${fmtPct(pct(s.ni,s.leads))}</td><td>${fmtPct(pct(s.prospect,s.leads))}</td><td>${fmtPct(pct(s.seat,s.leads))}</td></tr>`;}).join('');
+    '<tr><th>Counsellor</th>'+statusTableHeader()+'</tr>'+
+    cnsKeys.map((k,i)=>statusTableRow(k,cnsSums[i].total,cnsSums[i].statuses)).join('');
 
-  // Status donut
-  donutChart('statusChart',
-    ['Application Done','Call Back','Drop','Not Connected','Not Interested','Prospect Stage','Seat Booked'],
-    [t.app,t.cb,t.drop,t.nc,t.ni,t.prospect,t.seat]);
+  // Status donut — every status found, automatically
+  donutChart('statusChart',STATUS_LIST,STATUS_LIST.map(s=>statusCount(t,s)));
 
   // Insights
   const insights=[
-    `Total leads in current filter: ${t.leads}.`,
-    `Application conversion: ${fmtPct(pct(t.app,t.leads))} (${t.app} of ${t.leads} leads).`,
-    `Prospect conversion: ${fmtPct(pct(t.prospect,t.leads))} of total leads.`,
-    `Seat booking conversion: ${fmtPct(pct(t.seat,t.leads))} of total leads (${t.seat} seats).`,
-    `Not connected: ${fmtPct(pct(t.nc,t.leads))} of leads. Not interested: ${fmtPct(pct(t.ni,t.leads))}. Dropped: ${fmtPct(pct(t.drop,t.leads))}.`,
+    `Total leads in current filter: ${t.total}.`,
+    `Application conversion: ${fmtPct(pct(app,t.total))} (${app} of ${t.total} leads).`,
+    `Prospect conversion: ${fmtPct(pct(prospect,t.total))} of total leads.`,
+    `Enrollment conversion: ${fmtPct(pct(enroll,t.total))} of total leads (${enroll} enrollments).`,
   ];
-  mgrKeys.forEach((k,i)=>{const s=mgrSums[i]; insights.push(`${k}: ${s.leads} leads, ${fmtPct(pct(s.seat,s.leads))} lead-to-seat conversion.`);});
-  srcKeys.forEach((k,i)=>{const s=srcSums[i]; insights.push(`${k} source: ${s.leads} leads, ${fmtPct(pct(s.app,s.leads))} application conversion.`);});
+  STATUS_LIST.filter(s=>!['Application Done','Prospect Stage','Enrollment'].includes(s)).forEach(s=>{
+    insights.push(`${s}: ${fmtPct(pct(statusCount(t,s),t.total))} of leads.`);
+  });
+  mgrKeys.forEach((k,i)=>{const s=mgrSums[i]; insights.push(`${k}: ${s.total} leads, ${fmtPct(pct(statusCount(s,'Enrollment'),s.total))} lead-to-enrollment conversion.`);});
+  srcKeys.forEach((k,i)=>{const s=srcSums[i]; insights.push(`${k} source: ${s.total} leads, ${fmtPct(pct(statusCount(s,'Application Done'),s.total))} application conversion.`);});
   document.getElementById('insightsList').innerHTML=insights.map(i=>`<li>${i}</li>`).join('');
 
   if(activeMgr) drillManager(activeMgr); else document.getElementById('drillArea').innerHTML='<p class="drill-hint">Select a manager above, or click a manager row in the table, to see their funnel and counsellor breakdown here.</p>';
 }
 
 function drillManager(mgr){
-  const rows=RAW.filter(r=>r[COLS.manager]===mgr);
-  const s=sumRows(rows);
-  const byCns=groupBy(rows,'counsellor');
+  const groups=RAW.filter(g=>g.manager===mgr);
+  const s=mergeGroups(groups);
+  const app=statusCount(s,'Application Done'), prospect=statusCount(s,'Prospect Stage'), enroll=statusCount(s,'Enrollment');
+  const byCns=groupByField(groups,'counsellor');
   const rowsHtml=Object.keys(byCns).map(c=>{
-    const cs=sumRows(byCns[c]);
-    return `<tr><td>${c}</td><td>${cs.leads}</td><td>${cs.app}</td><td>${fmtPct(pct(cs.app,cs.leads))}</td><td>${cs.prospect}</td><td>${fmtPct(pct(cs.prospect,cs.leads))}</td><td>${cs.seat}</td><td>${fmtPct(pct(cs.seat,cs.leads))}</td></tr>`;
+    const cs=mergeGroups(byCns[c]);
+    return statusTableRow(c,cs.total,cs.statuses);
   }).join('');
   document.getElementById('drillArea').innerHTML=`
-    <h3 style="font-size:1rem;margin-bottom:8px">${mgr} — ${s.leads} leads → ${s.app} app (${fmtPct(pct(s.app,s.leads))}) → ${s.prospect} prospect (${fmtPct(pct(s.prospect,s.app))} of app) → ${s.seat} seats (${fmtPct(pct(s.seat,s.prospect))} of prospect)</h3>
-    <div class="scroll-x"><table><tr><th>Counsellor</th><th>Leads</th><th>App</th><th>App %</th><th>Prospect</th><th>Prospect %</th><th>Seat</th><th>Seat %</th></tr>${rowsHtml}</table></div>`;
+    <h3 style="font-size:1rem;margin-bottom:8px">${mgr} — ${s.total} leads → ${app} app (${fmtPct(pct(app,s.total))}) → ${prospect} prospect (${fmtPct(pct(prospect,app))} of app) → ${enroll} enrolled (${fmtPct(pct(enroll,prospect))} of prospect)</h3>
+    <div class="scroll-x"><table><tr><th>Counsellor</th>${statusTableHeader()}</tr>${rowsHtml}</table></div>`;
 }
 
-function isRawLeads(rows){
-  if(!rows.length) return false;
-  const keys=Object.keys(rows[0]).map(k=>k.trim().toLowerCase());
-  return keys.includes('status') && !keys.includes('total leads');
-}
-function aggregateRawLeads(rows){
-  const find=(obj,name)=>{const k=Object.keys(obj).find(k=>k.trim().toLowerCase()===name); return k?obj[k]:'';};
-  const groups={};
-  rows.forEach(r=>{
-    const source=String(find(r,'source')||'Unknown').trim();
-    const manager=String(find(r,'manager name')||'Unknown').trim();
-    const counsellor=String(find(r,'counsellor name')||'Unknown').trim();
-    const status=String(find(r,'status')||'').trim();
-    const key=source+'||'+manager+'||'+counsellor;
-    if(!groups[key]){
-      groups[key]={[COLS.source]:source,[COLS.manager]:manager,[COLS.counsellor]:counsellor,[COLS.leads]:0};
-      NUMKEYS.filter(k=>k!=='leads').forEach(k=>groups[key][COLS[k]]=0);
-    }
-    groups[key][COLS.leads]+=1;
-    const statusKey=Object.keys(COLS).find(k=>COLS[k].toLowerCase()===status.toLowerCase());
-    if(statusKey && statusKey!=='leads' && statusKey!=='source' && statusKey!=='manager' && statusKey!=='counsellor'){
-      groups[key][COLS[statusKey]]+=1;
-    }
-  });
-  return Object.values(groups);
-}
-function loadData(rows){
-  if(isRawLeads(rows)) rows=aggregateRawLeads(rows);
-  RAW=rows;
+function loadData(rawRows){
+  RAW=toGroups(rawRows);
   document.getElementById('fSource').value='';document.getElementById('fManager').value='';document.getElementById('fCounsellor').value='';
   render();
 }
@@ -397,6 +445,7 @@ document.getElementById('csvFile').addEventListener('change',e=>{
 
 loadData(SHEET_SNAPSHOT.length?SHEET_SNAPSHOT.slice():sampleData());
 fetchSheetLive(true);
+
 </script>
 </body>
 </html>
