@@ -1,488 +1,139 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Lead Conversion & Sales Performance Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<title>Lead Conversion Dashboard</title>
 <style>
-:root{
-  --orange:#E8621C; --orange-deep:#C24D0F; --orange-tint:#FDEDE3;
-  --grey-900:#231F1E; --grey-700:#4A433F; --grey-400:#8A817B; --grey-200:#E7E1DA;
-  --white:#FFFFFF; --bg:#FAF7F4; --good:#2E8B57; --bad:#C0392B;
-  --radius:14px;
-  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
-  box-sizing:border-box;
-}
-*{box-sizing:border-box}
+:root{--or:#E8621C;--or2:#C24D0F;--tint:#FDEDE3;--ink:#231F1E;--mid:#6B625C;--line:#E9E2DA;--card:#fff;--bg:#F6F3EF;--ok:#2E8B57;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#F3EEE9;--mid:#B5ADA6;--line:#3A3431;--card:#2A2523;--bg:#1C1918;--tint:#3B2A20}}
+:root[data-theme="dark"]{--ink:#F3EEE9;--mid:#B5ADA6;--line:#3A3431;--card:#2A2523;--bg:#1C1918;--tint:#3B2A20}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;background:var(--bg);color:var(--grey-900);font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;line-height:1.4}
-h1,h2,h3{font-family:Georgia,'Times New Roman',serif;margin:0}
-.wrap{max-width:1400px;margin:0 auto;padding:20px 24px 60px}
-header.top{background:var(--grey-900);color:var(--white);padding:22px 24px;position:sticky;top:0;z-index:10}
-header.top .head-row{max-width:1400px;margin:0 auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-header.top .bar{width:6px;height:34px;background:var(--orange);border-radius:3px}
-header.top h1{font-size:1.5rem;font-weight:700;color:var(--white)}
-header.top p{margin:2px 0 0;color:var(--grey-200);font-size:.85rem;font-family:inherit}
-
-.filters{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0;align-items:center}
-.filters select{padding:9px 12px;border-radius:9px;border:1px solid var(--grey-200);background:var(--white);color:var(--grey-900);font-size:.88rem;min-width:150px}
-.filters button{padding:9px 16px;border-radius:9px;border:1px solid var(--orange);background:var(--white);color:var(--orange-deep);font-weight:600;font-size:.85rem;cursor:pointer}
-.filters button.primary{background:var(--orange);color:var(--white)}
-.filters .datasrc{margin-left:auto;display:flex;gap:8px}
-.filters input[type=file]{font-size:.8rem}
-
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin:8px 0 26px}
-.kpi{background:var(--white);border:1px solid var(--grey-200);border-radius:var(--radius);padding:16px;position:relative;overflow:hidden;transition:transform .15s,box-shadow .15s;box-shadow:0 1px 2px rgba(35,31,30,.04)}
-.kpi:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(232,98,28,.12)}
-.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--orange),var(--orange-deep))}
-.kpi .lbl{font-size:.72rem;color:var(--grey-400);text-transform:uppercase;letter-spacing:.04em}
-.kpi .num{font-family:Georgia,serif;font-size:1.75rem;color:var(--grey-900);margin-top:4px}
-.kpi .sub{font-size:.78rem;color:var(--orange-deep);font-weight:600;margin-top:2px}
-
-.hero{display:flex;gap:24px;align-items:center;flex-wrap:wrap;background:linear-gradient(135deg,var(--grey-900),#33302E);border-radius:var(--radius);padding:22px 26px;color:#fff;margin:8px 0 20px}
-.hero .ring-big{width:110px;height:110px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.hero .ring-big .inner{width:82px;height:82px;border-radius:50%;background:var(--grey-900);display:flex;flex-direction:column;align-items:center;justify-content:center}
-.hero .ring-big .inner b{font-size:1.3rem;font-family:Georgia,serif}
-.hero .ring-big .inner span{font-size:.65rem;color:var(--grey-200);text-transform:uppercase}
-.hero-stats{display:flex;gap:26px;flex-wrap:wrap}
-.hero-stats div{min-width:100px}
-.hero-stats .n{font-family:Georgia,serif;font-size:1.4rem}
-.hero-stats .l{font-size:.72rem;color:var(--grey-200);text-transform:uppercase;letter-spacing:.03em}
-
-section{background:var(--white);border:1px solid var(--grey-200);border-radius:var(--radius);padding:20px 22px;margin-bottom:20px}
-section h2{font-size:1.1rem;color:var(--grey-900);margin-bottom:14px;padding-left:12px;border-left:4px solid var(--orange);display:flex;align-items:center;gap:8px}
-.pct-cell{display:flex;align-items:center;justify-content:flex-end;gap:8px}
-.pct-track{width:52px;height:6px;background:var(--grey-200);border-radius:3px;overflow:hidden;flex-shrink:0}
-.pct-fill{height:100%;background:linear-gradient(90deg,var(--orange),var(--orange-deep));border-radius:3px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-@media(max-width:820px){.grid2{grid-template-columns:1fr}}
-
-.funnel{display:flex;flex-direction:column;gap:6px;max-width:760px;margin:0 auto}
-.funnel .stage{display:flex;align-items:center;gap:14px}
-.funnel .fbar{height:38px;background:linear-gradient(90deg,var(--orange),var(--orange-deep));border-radius:8px;display:flex;align-items:center;padding:0 14px;color:#fff;font-weight:600;font-size:.85rem;white-space:nowrap}
-.funnel .flabel{width:130px;font-size:.85rem;color:var(--grey-700);text-align:right;flex-shrink:0}
-.funnel .fmeta{font-size:.75rem;color:var(--grey-400);margin-left:8px}
-.funnel .fconv{text-align:center;font-size:.75rem;color:var(--orange-deep);font-weight:600;margin:2px 0 2px 144px}
-
-table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:6px}
-th{background:var(--grey-900);color:var(--white);text-align:right;padding:8px 10px;font-weight:600}
-th:first-child,td:first-child{text-align:left}
-td{padding:7px 10px;border-bottom:1px solid var(--grey-200);text-align:right}
-tbody tr:hover{background:var(--orange-tint);cursor:pointer}
-.scroll-x{overflow-x:auto}
-.pct-bar{display:inline-block;height:6px;background:var(--orange);border-radius:3px;vertical-align:middle;margin-left:6px}
-
-canvas{max-height:280px}
-.insights ul{margin:0;padding-left:18px;font-size:.88rem;color:var(--grey-700)}
-.insights li{margin-bottom:6px}
-.drill-hint{font-size:.78rem;color:var(--grey-400);margin-bottom:6px}
-.badge{display:inline-block;background:var(--orange-tint);color:var(--orange-deep);border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:600}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){}}
-</style>
-</head>
-<body>
-<header class="top"><div class="head-row">
-  <div class="bar"></div>
-  <div><h1>Lead Conversion & Sales Performance</h1><p>Source · Manager · Counsellor conversion analysis</p></div>
-</div></header>
-
-<div class="wrap">
-  <div class="filters">
-    <select id="fSource"><option value="">All Sources</option></select>
-    <select id="fManager"><option value="">All Managers</option></select>
-    <select id="fCounsellor"><option value="">All Counsellors</option></select>
-    <button id="resetBtn">Reset filters</button>
-    <div class="datasrc">
-      <span id="sheetStatus" style="font-size:.78rem;color:var(--grey-400);align-self:center"></span>
-      <button id="sheetBtn" class="primary">Refresh from Sheet now</button>
-      <button id="sampleBtn">Load sample data</button>
-      <input type="file" id="csvFile" accept=".csv">
-    </div>
-  </div>
-
-  <div class="hero" id="hero"></div>
-
-  <div class="kpis" id="kpiRow"></div>
-
-  <section>
-    <h2>🔻 Lead Conversion Funnel</h2>
-    <div class="funnel" id="funnel"></div>
-  </section>
-
-  <div class="grid2">
-    <section>
-      <h2>📍 Source Performance</h2>
-      <canvas id="sourceChart"></canvas>
-      <div class="scroll-x"><table id="sourceTable"></table></div>
-    </section>
-    <section>
-      <h2>👤 Manager Performance</h2>
-      <div class="drill-hint">Click a manager row to drill into their counsellors below.</div>
-      <canvas id="managerChart"></canvas>
-      <div class="scroll-x"><table id="managerTable"></table></div>
-    </section>
-  </div>
-
-  <div class="grid2">
-    <section>
-      <h2>🎯 Counsellor Performance <span class="badge" id="counsFilterBadge">All managers</span></h2>
-      <canvas id="counsChart"></canvas>
-      <div class="scroll-x"><table id="counsTable"></table></div>
-    </section>
-    <section>
-      <h2>📊 Lead Status Distribution</h2>
-      <canvas id="statusChart"></canvas>
-    </section>
-  </div>
-
-  <section>
-    <h2>🔍 Manager → Counsellor Drill-Down</h2>
-    <div id="drillArea"><p class="drill-hint">Select a manager above, or click a manager row in the table, to see their funnel and counsellor breakdown here.</p></div>
-  </section>
-
-  <section class="insights">
-    <h2>💡 Management Insights</h2>
-    <ul id="insightsList"></ul>
-  </section>
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 'Segoe UI',system-ui,-apple-system,Arial,sans-serif}
+.wrap{max-width:1300px;margin:0 auto;padding:18px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px}
+h1{margin:0;font:700 1.45rem Georgia,serif}h1 span{color:var(--or)}
+.sub{color:var(--mid);font-size:.8rem}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:16px}
+select,button{font:inherit;padding:8px 11px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+button{cursor:pointer;font-weight:600}button.p{background:var(--or);border-color:var(--or);color:#fff}
+.sp{flex:1}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.card h2{margin:0 0 12px;font:700 .95rem 'Segoe UI',sans-serif;display:flex;align-items:center;gap:8px}
+.card h2::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--or)}
+.g{display:grid;gap:14px;margin-bottom:14px}
+.k5{grid-template-columns:repeat(5,1fr)}.c2{grid-template-columns:1fr 1fr}.c3{grid-template-columns:1.1fr .9fr}
+@media(max-width:900px){.k5{grid-template-columns:1fr 1fr}.c2,.c3{grid-template-columns:1fr}}
+.kpi .l{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mid)}
+.kpi .n{font:700 2rem Georgia,serif;margin:2px 0}
+.kpi .s{font-size:.78rem;color:var(--or2);font-weight:600}
+.kpi.hero{background:linear-gradient(135deg,var(--or),var(--or2));border:0;color:#fff;display:flex;align-items:center;gap:14px}
+.kpi.hero .l,.kpi.hero .s{color:#FFE3D2}
+.ring{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}
+.ring i{width:52px;height:52px;border-radius:50%;background:var(--or2);display:grid;place-items:center;font:700 .8rem sans-serif;font-style:normal}
+.fn{display:flex;flex-direction:column;gap:8px}
+.fr{display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:center}
+.fr .t{height:34px;background:var(--tint);border-radius:9px;overflow:hidden}
+.fr .t b{display:flex;align-items:center;height:100%;padding:0 10px;color:#fff;font-size:.8rem;white-space:nowrap;background:linear-gradient(90deg,var(--or),var(--or2));border-radius:9px;min-width:fit-content}
+.arrow{margin-left:130px;font-size:.74rem;color:var(--or2);font-weight:600}
+.donut{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.leg{flex:1;min-width:160px;display:grid;gap:5px;font-size:.8rem}
+.leg div{display:flex;align-items:center;gap:7px}.leg i{width:10px;height:10px;border-radius:3px;flex-shrink:0}.leg span{margin-left:auto;color:var(--mid)}
+.row{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:0}.row.click{cursor:pointer}.row.click:hover{background:var(--tint)}
+.row.on{background:var(--tint)}
+.trk{height:10px;background:var(--line);border-radius:5px;overflow:hidden}.trk b{display:block;height:100%;background:linear-gradient(90deg,var(--or),var(--or2))}
+.chips{display:flex;gap:6px;font-size:.72rem;color:var(--mid);white-space:nowrap}.chips em{font-style:normal;color:var(--or2);font-weight:700}
+.nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th{text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);padding:6px 8px;border-bottom:2px solid var(--line)}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.sc{display:flex;height:12px;border-radius:6px;overflow:hidden;min-width:160px;background:var(--line)}.sc i{display:block;height:100%}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;background:var(--tint);color:var(--or2);font-weight:700;font-size:.75rem}
+.scroll{overflow-x:auto}
+ul{margin:0;padding-left:18px;color:var(--mid)}li{margin:4px 0}
+.empty{color:var(--mid);padding:14px 0}
+</style></head><body><div class="wrap">
+<header><div><h1>Lead Conversion <span>Dashboard</span></h1><div class="sub" id="stat">Loading…</div></div>
+<div class="sub">Source → Manager → Counsellor → Enrollment</div></header>
+<div class="bar">
+<select id="fS"><option value="">All sources</option></select>
+<select id="fM"><option value="">All managers</option></select>
+<select id="fC"><option value="">All counsellors</option></select>
+<button id="rst">Reset</button><div class="sp"></div>
+<button id="live" class="p">Refresh from Sheet</button><button id="smp">Sample data</button>
+<input type="file" id="file" accept=".csv" style="max-width:190px">
 </div>
-
+<div class="g k5" id="kpis"></div>
+<div class="g c3"><div class="card"><h2>Conversion funnel</h2><div class="fn" id="fun"></div></div>
+<div class="card"><h2>Lead status mix</h2><div class="donut" id="don"></div></div></div>
+<div class="g c2"><div class="card"><h2>Source performance</h2><div id="src"></div></div>
+<div class="card"><h2>Manager performance <span class="sub">(click to filter)</span></h2><div id="mgr"></div></div></div>
+<div class="card" style="margin-bottom:14px"><h2>Counsellor performance</h2><div class="scroll" id="cns"></div><div class="leg" id="cleg" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-top:12px"></div></div>
+<div class="card"><h2>Insights</h2><ul id="ins"></ul></div>
+</div>
 <script>
-const COLS = {source:'SOURCE',manager:'MANAGER NAME',counsellor:'COUNSELLOR NAME',leads:'Total Leads'};
-const CORE_STATUSES = ['Application Done','Prospect Stage','Enrollment','Call Back','Not Connected','Not Interested','Drop'];
-const SHEET_SOURCE_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRk9YPasfN1GGUNGuJ_uZY7NwVvTZVX0MIkp17BDzmOGVq5Mx8Vcl7n-64cbBGcZiABBfDEDguWKzvj/pub?output=csv';
-const SHEET_SNAPSHOT_TIME='2026-09-23';
-const SHEET_SNAPSHOT=[
-  // Ram's connected "Leads" sheet — refreshed by Claude on request or by the live fetch below.
-  // Empty as of the last refresh (headers only, no lead rows yet).
-];
-let RAW=[]; let STATUS_LIST=[]; let charts={};
-
-// ---- Data model: RAW is an array of group objects:
-// { source, manager, counsellor, total, statuses:{ <any status string>: count } }
-// Any manager/counsellor/status value found in the sheet is accepted as-is — nothing hardcoded.
-
-function sampleData(){
-  const sources=['Google Ads','Facebook','Referral','Website','Walk-in'];
-  const mgrs=[['Manager A',['Counsellor 1','Counsellor 2','Counsellor 3']],
-              ['Manager B',['Counsellor 4','Counsellor 5']],
-              ['Manager C',['Counsellor 6','Counsellor 7','Counsellor 8']]];
-  let rows=[]; let seed=7;
-  function rnd(n){seed=(seed*9301+49297)%233280; return Math.floor((seed/233280)*n);}
-  mgrs.forEach(([mgr,cs])=>cs.forEach(c=>{
-    sources.forEach(s=>{
-      const leads=20+rnd(60);
-      const app=Math.round(leads*(0.25+rnd(20)/100));
-      const prospect=Math.round(app*(0.35+rnd(25)/100));
-      const enroll=Math.round(prospect*(0.2+rnd(20)/100));
-      const cb=Math.round(leads*0.1), drop=Math.round(leads*0.08),
-            nc=Math.round(leads*0.12), ni=Math.round(leads*0.1);
-      const counts={'Application Done':app-prospect,'Call Back':cb,'Drop':drop,'Not Connected':nc,
-        'Not Interested':ni,'Prospect Stage':prospect-enroll,'Enrollment':enroll};
-      let placed=0;
-      Object.keys(counts).forEach(status=>{
-        for(let i=0;i<Math.max(0,counts[status]);i++){
-          rows.push({Source:s,'Manager Name':mgr,'Counsellor Name':c,Status:status});
-          placed++;
-        }
-      });
-      for(let i=placed;i<leads;i++) rows.push({Source:s,'Manager Name':mgr,'Counsellor Name':c,Status:'Unspecified'});
-    });
-  }));
-  return rows;
-}
-
-function parseCSV(text){
-  const lines=text.trim().split(/\r?\n/); const headers=lines[0].split(',').map(h=>h.trim());
-  return lines.slice(1).filter(l=>l.trim()).map(l=>{
-    const vals=l.split(','); const o={};
-    headers.forEach((h,i)=>{o[h]=vals[i]!==undefined?vals[i].trim():'';});
-    return o;
-  });
-}
-
-function pct(a,b){return b>0?(a/b*100):0;}
-function fmtPct(p){return p.toFixed(1)+'%';}
-function statusCount(t,name){return (t.statuses&&t.statuses[name])||0;}
-
-// Turn any uploaded/fetched rows (raw lead-level, OR the old fixed-column
-// aggregated format) into the group model above. No status or manager name
-// is ever filtered out — whatever appears in the sheet is kept and shown.
-function toGroups(rows){
-  if(!rows.length) return [];
-  const keys=Object.keys(rows[0]).map(k=>k.trim().toLowerCase());
-  const find=(obj,name)=>{const k=Object.keys(obj).find(k=>k.trim().toLowerCase()===name); return k!==undefined?obj[k]:'';};
-  const groups={};
-  const isRaw = keys.includes('status') && !keys.includes('total leads');
-
-  if(isRaw){
-    rows.forEach(r=>{
-      const source=String(find(r,'source')||'Unknown').trim()||'Unknown';
-      const manager=String(find(r,'manager name')||'Unknown').trim()||'Unknown';
-      const counsellor=String(find(r,'counsellor name')||'Unknown').trim()||'Unknown';
-      let status=String(find(r,'status')||'').trim();
-      if(!status) status='Unspecified';
-      const key=source+'||'+manager+'||'+counsellor;
-      if(!groups[key]) groups[key]={source,manager,counsellor,total:0,statuses:{}};
-      groups[key].total+=1;
-      groups[key].statuses[status]=(groups[key].statuses[status]||0)+1;
-    });
-  } else {
-    // old fixed-column aggregated format (SOURCE, MANAGER NAME, COUNSELLOR NAME, Total Leads, <status columns>...)
-    const fixedCols=['source','manager name','counsellor name','total leads'];
-    rows.forEach(r=>{
-      const source=String(find(r,'source')||'Unknown').trim()||'Unknown';
-      const manager=String(find(r,'manager name')||'Unknown').trim()||'Unknown';
-      const counsellor=String(find(r,'counsellor name')||'Unknown').trim()||'Unknown';
-      const total=Number(find(r,'total leads'))||0;
-      const statuses={};
-      Object.keys(r).forEach(h=>{
-        const hl=h.trim().toLowerCase();
-        if(!fixedCols.includes(hl)){
-          const label = hl==='seat booked' ? 'Enrollment' : h.trim();
-          const v=Number(r[h])||0;
-          if(v) statuses[label]=(statuses[label]||0)+v;
-        }
-      });
-      const known=Object.values(statuses).reduce((a,b)=>a+b,0);
-      if(total>known) statuses['Unspecified']=(statuses['Unspecified']||0)+(total-known);
-      const key=source+'||'+manager+'||'+counsellor;
-      groups[key]={source,manager,counsellor,total,statuses};
-    });
-  }
-  return Object.values(groups);
-}
-
-function mergeGroups(list){
-  const out={total:0,statuses:{}};
-  list.forEach(g=>{
-    out.total+=g.total;
-    Object.keys(g.statuses).forEach(k=>{out.statuses[k]=(out.statuses[k]||0)+g.statuses[k];});
-  });
-  return out;
-}
-function groupByField(list,field){
-  const map={};
-  list.forEach(g=>{const key=g[field]||'Unknown'; (map[key]=map[key]||[]).push(g);});
-  return map;
-}
-function computeStatusList(list){
-  const seen=new Set();
-  list.forEach(g=>Object.keys(g.statuses).forEach(k=>seen.add(k)));
-  const core=CORE_STATUSES.filter(s=>seen.has(s));
-  const extra=[...seen].filter(s=>!CORE_STATUSES.includes(s)&&s!=='Unspecified').sort();
-  const rest=seen.has('Unspecified')?['Unspecified']:[];
-  return [...core,...extra,...rest];
-}
-function populateSelect(sel,values,current){
-  sel.querySelectorAll('option:not(:first-child)').forEach(o=>o.remove());
-  [...new Set(values)].sort().forEach(v=>{
-    const o=document.createElement('option'); o.value=v; o.textContent=v;
-    if(v===current) o.selected=true;
-    sel.appendChild(o);
-  });
-}
-
-function applyFilters(){
-  const src=document.getElementById('fSource').value;
-  const mgr=document.getElementById('fManager').value;
-  const cns=document.getElementById('fCounsellor').value;
-  return RAW.filter(g=>(!src||g.source===src)&&(!mgr||g.manager===mgr)&&(!cns||g.counsellor===cns));
-}
-
-function destroy(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
-
-function barChart(id,labels,datasets,horizontal){
-  try{
-    destroy(id);
-    const el=document.getElementById(id); if(!el||typeof Chart==='undefined') return;
-    charts[id]=new Chart(el,{type:'bar',
-      data:{labels,datasets},
-      options:{indexAxis:horizontal?'y':'x',responsive:true,
-        plugins:{legend:{display:datasets.length>1,labels:{font:{size:11}}}},
-        scales:{x:{ticks:{font:{size:10}}},y:{ticks:{font:{size:10}}}}}});
-  }catch(err){console.error('barChart failed for',id,err);}
-}
-function donutChart(id,labels,data){
-  try{
-    destroy(id);
-    const el=document.getElementById(id); if(!el||typeof Chart==='undefined') return;
-    const palette=['#E8621C','#C24D0F','#8A817B','#4A433F','#F2A26B','#E7E1DA','#231F1E','#D98E5C','#B5AFA9','#7A5236'];
-    charts[id]=new Chart(el,{type:'doughnut',
-      data:{labels,datasets:[{data,backgroundColor:labels.map((_,i)=>palette[i%palette.length])}]},
-      options:{plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}});
-  }catch(err){console.error('donutChart failed for',id,err);}
-}
-
-function pctCell(p){return `<td><div class="pct-cell"><span>${fmtPct(p)}</span><div class="pct-track"><div class="pct-fill" style="width:${Math.min(100,p)}%"></div></div></div></td>`;}
-function statusTableRow(name,leads,statuses){
-  const cells=STATUS_LIST.map(s=>pctCell(pct(statuses[s]||0,leads))).join('');
-  return `<tr><td>${name}</td><td class="leadcell">${leads}</td>${cells}</tr>`;
-}
-function statusTableHeader(){
-  return '<th>Leads</th>'+STATUS_LIST.map(s=>`<th>${s} %</th>`).join('');
-}
-
+const SHEET_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRk9YPasfN1GGUNGuJ_uZY7NwVvTZVX0MIkp17BDzmOGVq5Mx8Vcl7n-64cbBGcZiABBfDEDguWKzvj/pub?output=csv';
+const APP='Application Done',PRO='Prospect Stage',ENR='Enrollment'; // funnel stage names (case-insensitive)
+const PAL=['#E8621C','#231F1E','#2E8B57','#F2A26B','#4A90A4','#8A817B','#C24D0F','#7A5236','#B5AFA9','#5C6B73','#D98E5C','#F5C6A5'];
+let ROWS=[],ST=[];const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct=(a,b)=>b>0?a/b*100:0,fp=p=>p.toFixed(1)+'%';
+function csv(t){const R=[];let r=[],f='',q=false;for(let i=0;i<t.length;i++){const c=t[i];
+ if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}
+ else if(c=='"')q=true;else if(c==','){r.push(f);f=''}
+ else if(c=='\n'||c=='\r'){if(c=='\r'&&t[i+1]=='\n')i++;r.push(f);R.push(r);r=[];f=''}else f+=c}
+ if(f!==''||r.length){r.push(f);R.push(r)}return R}
+function toRows(t){const R=csv(t);if(R.length<2)return[];const h=R[0].map(x=>x.trim().toLowerCase());
+ const ix=n=>h.indexOf(n);const a=ix('source'),b=ix('manager name'),c=ix('counsellor name'),d=ix('status');
+ return R.slice(1).map(r=>({source:(r[a]||'').trim(),manager:(r[b]||'').trim(),counsellor:(r[c]||'').trim(),status:(r[d]||'').trim()}))
+ .filter(x=>x.source||x.manager||x.counsellor||x.status)
+ .map(x=>({source:x.source||'Unknown',manager:x.manager||'Unknown',counsellor:x.counsellor||'Unknown',status:x.status||'Unspecified'}))}
+function sample(){let s=5;const rn=n=>(s=(s*9301+49297)%233280)/233280*n|0;const out=[];
+ const S=['Google Ads','Facebook','Referral','Website','Walk-in'],M={'Manager A':['Counsellor 1','Counsellor 2','Counsellor 3'],'Manager B':['Counsellor 4','Counsellor 5'],'Manager C':['Counsellor 6','Counsellor 7']};
+ const W=[['Application Done',14],['Prospect Stage',9],['Enrollment',5],['Call Back',12],['Not Connected',15],['Not Interested',12],['Drop',8],['Follow-up',10],['Unspecified',15]];
+ Object.entries(M).forEach(([m,cs])=>cs.forEach(c=>S.forEach(src=>{const n=25+rn(40);for(let i=0;i<n;i++){let x=rn(100),st='Unspecified';for(const[k,w]of W){if(x<w){st=k;break}x-=w}out.push({source:src,manager:m,counsellor:c,status:st})}})));return out}
+const tally=r=>{const m={};r.forEach(x=>m[x.status]=(m[x.status]||0)+1);return m};
+const get=(m,n)=>{n=n.toLowerCase();return Object.entries(m).reduce((a,[k,v])=>k.toLowerCase()===n?a+v:a,0)};
+const grp=(r,k)=>{const m={};r.forEach(x=>(m[x[k]]=m[x[k]]||[]).push(x));return m};
+const col=s=>PAL[ST.indexOf(s)%PAL.length];
+function fill(sel,vals,keep){const cur=keep;sel.querySelectorAll('option:not(:first-child)').forEach(o=>o.remove());
+ [...new Set(vals)].sort().forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o)});sel.value=cur&&[...sel.options].some(o=>o.value===cur)?cur:''}
+function seg(m,tot){return '<div class="sc">'+ST.filter(s=>m[s]).map(s=>`<i style="width:${pct(m[s],tot)}%;background:${col(s)}" title="${esc(s)}: ${m[s]} (${fp(pct(m[s],tot))})"></i>`).join('')+'</div>'}
 function render(){
-  STATUS_LIST=computeStatusList(RAW);
-  const filtered=applyFilters();
-  const t=mergeGroups(filtered);
-
-  populateSelect(document.getElementById('fSource'),RAW.map(g=>g.source),document.getElementById('fSource').value);
-  populateSelect(document.getElementById('fManager'),RAW.map(g=>g.manager),document.getElementById('fManager').value);
-  const cCol=document.getElementById('fManager').value?filtered:RAW;
-  populateSelect(document.getElementById('fCounsellor'),cCol.map(g=>g.counsellor),document.getElementById('fCounsellor').value);
-
-  const app=statusCount(t,'Application Done'), prospect=statusCount(t,'Prospect Stage'), enroll=statusCount(t,'Enrollment');
-  const overallPct=pct(enroll,t.total);
-  const ringDeg=Math.min(360,overallPct*3.6);
-  document.getElementById('hero').innerHTML=`
-    <div class="ring-big" style="background:conic-gradient(var(--orange) 0deg ${ringDeg}deg, rgba(255,255,255,.18) ${ringDeg}deg 360deg)">
-      <div class="inner"><b>${fmtPct(overallPct)}</b><span>Lead→Enroll</span></div>
-    </div>
-    <div class="hero-stats">
-      <div><div class="n">${t.total}</div><div class="l">Total Leads</div></div>
-      <div><div class="n">${app}</div><div class="l">Applications</div></div>
-      <div><div class="n">${prospect}</div><div class="l">Prospects</div></div>
-      <div><div class="n">${enroll}</div><div class="l">Enrollments</div></div>
-      <div><div class="n">${STATUS_LIST.length}</div><div class="l">Status Types</div></div>
-    </div>`;
-  const kpis=[
-    ['Total Leads',t.total,''],
-    ['Applications',app,fmtPct(pct(app,t.total))+' of leads'],
-    ['App Conversion',fmtPct(pct(app,t.total)),''],
-    ['Prospects',prospect,fmtPct(pct(prospect,t.total))+' of leads'],
-    ['Prospect Conversion',fmtPct(pct(prospect,t.total)),''],
-    ['Enrollments',enroll,fmtPct(pct(enroll,t.total))+' of leads'],
-    ['Enrollment Rate',fmtPct(pct(enroll,prospect)),'of prospects'],
-    ['Lead → Enrollment',fmtPct(pct(enroll,t.total)),'overall'],
-  ];
-  document.getElementById('kpiRow').innerHTML=kpis.map(k=>`<div class="kpi"><div class="lbl">${k[0]}</div><div class="num">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');
-
-  const stages=[['Total Leads',t.total],['Application Done',app],['Prospect Stage',prospect],['Enrollment',enroll]];
-  const max=stages[0][1]||1;
-  let fh='';
-  stages.forEach((s,i)=>{
-    const w=Math.max(8,(s[1]/max*100));
-    fh+=`<div class="stage"><div class="flabel">${s[0]}</div><div class="fbar" style="width:${w}%">${s[1]} · ${fmtPct(pct(s[1],t.total))}</div></div>`;
-    if(i<stages.length-1){
-      fh+=`<div class="fconv">↓ stage conversion: ${fmtPct(pct(stages[i+1][1],s[1]))}</div>`;
-    }
-  });
-  document.getElementById('funnel').innerHTML=fh;
-
-  // Source
-  const bySrc=groupByField(filtered,'source');
-  const srcKeys=Object.keys(bySrc);
-  const srcSums=srcKeys.map(k=>mergeGroups(bySrc[k]));
-  document.getElementById('sourceTable').innerHTML=
-    '<tr><th>Source</th>'+statusTableHeader()+'</tr>'+
-    srcKeys.map((k,i)=>statusTableRow(k,srcSums[i].total,srcSums[i].statuses)).join('');
-  barChart('sourceChart',srcKeys,[{label:'Total Leads',data:srcSums.map(s=>s.total),backgroundColor:'#E8621C'}],true);
-
-  // Manager
-  const byMgr=groupByField(filtered,'manager');
-  const mgrKeys=Object.keys(byMgr);
-  const mgrSums=mgrKeys.map(k=>mergeGroups(byMgr[k]));
-  const mgrTable=document.getElementById('managerTable');
-  mgrTable.innerHTML='<tr><th>Manager</th>'+statusTableHeader()+'</tr>'+
-    mgrKeys.map((k,i)=>`<tr data-mgr="${k}">${statusTableRow(k,mgrSums[i].total,mgrSums[i].statuses).slice(4)}`).join('');
-  mgrTable.querySelectorAll('tr[data-mgr]').forEach(tr=>tr.addEventListener('click',()=>{
-    document.getElementById('fManager').value=tr.dataset.mgr;
-    document.getElementById('fCounsellor').value='';
-    render(); drillManager(tr.dataset.mgr);
-  }));
-  barChart('managerChart',mgrKeys,[
-    {label:'App %',data:mgrSums.map(s=>pct(statusCount(s,'Application Done'),s.total).toFixed(1)),backgroundColor:'#E8621C'},
-    {label:'Prospect %',data:mgrSums.map(s=>pct(statusCount(s,'Prospect Stage'),s.total).toFixed(1)),backgroundColor:'#8A817B'},
-    {label:'Enrollment %',data:mgrSums.map(s=>pct(statusCount(s,'Enrollment'),s.total).toFixed(1)),backgroundColor:'#231F1E'}
-  ],false);
-
-  // Counsellor
-  const activeMgr=document.getElementById('fManager').value;
-  document.getElementById('counsFilterBadge').textContent=activeMgr||'All managers';
-  const byCns=groupByField(filtered,'counsellor');
-  const cnsKeys=Object.keys(byCns);
-  const cnsSums=cnsKeys.map(k=>mergeGroups(byCns[k]));
-  document.getElementById('counsTable').innerHTML=
-    '<tr><th>Counsellor</th>'+statusTableHeader()+'</tr>'+
-    cnsKeys.map((k,i)=>statusTableRow(k,cnsSums[i].total,cnsSums[i].statuses)).join('');
-  barChart('counsChart',cnsKeys,[{label:'Leads',data:cnsSums.map(s=>s.total),backgroundColor:'#E8621C'}],true);
-
-  // Status donut — every status found, automatically
-  donutChart('statusChart',STATUS_LIST,STATUS_LIST.map(s=>statusCount(t,s)));
-
-  // Insights
-  const insights=[
-    `Total leads in current filter: ${t.total}.`,
-    `Application conversion: ${fmtPct(pct(app,t.total))} (${app} of ${t.total} leads).`,
-    `Prospect conversion: ${fmtPct(pct(prospect,t.total))} of total leads.`,
-    `Enrollment conversion: ${fmtPct(pct(enroll,t.total))} of total leads (${enroll} enrollments).`,
-  ];
-  STATUS_LIST.filter(s=>!['Application Done','Prospect Stage','Enrollment'].includes(s)).forEach(s=>{
-    insights.push(`${s}: ${fmtPct(pct(statusCount(t,s),t.total))} of leads.`);
-  });
-  mgrKeys.forEach((k,i)=>{const s=mgrSums[i]; insights.push(`${k}: ${s.total} leads, ${fmtPct(pct(statusCount(s,'Enrollment'),s.total))} lead-to-enrollment conversion.`);});
-  srcKeys.forEach((k,i)=>{const s=srcSums[i]; insights.push(`${k} source: ${s.total} leads, ${fmtPct(pct(statusCount(s,'Application Done'),s.total))} application conversion.`);});
-  document.getElementById('insightsList').innerHTML=insights.map(i=>`<li>${i}</li>`).join('');
-
-  if(activeMgr) drillManager(activeMgr); else document.getElementById('drillArea').innerHTML='<p class="drill-hint">Select a manager above, or click a manager row in the table, to see their funnel and counsellor breakdown here.</p>';
-}
-
-function drillManager(mgr){
-  const groups=RAW.filter(g=>g.manager===mgr);
-  const s=mergeGroups(groups);
-  const app=statusCount(s,'Application Done'), prospect=statusCount(s,'Prospect Stage'), enroll=statusCount(s,'Enrollment');
-  const byCns=groupByField(groups,'counsellor');
-  const rowsHtml=Object.keys(byCns).map(c=>{
-    const cs=mergeGroups(byCns[c]);
-    return statusTableRow(c,cs.total,cs.statuses);
-  }).join('');
-  document.getElementById('drillArea').innerHTML=`
-    <h3 style="font-size:1rem;margin-bottom:8px">${mgr} — ${s.total} leads → ${app} app (${fmtPct(pct(app,s.total))}) → ${prospect} prospect (${fmtPct(pct(prospect,app))} of app) → ${enroll} enrolled (${fmtPct(pct(enroll,prospect))} of prospect)</h3>
-    <div class="scroll-x"><table><tr><th>Counsellor</th>${statusTableHeader()}</tr>${rowsHtml}</table></div>`;
-}
-
-function loadData(rawRows){
-  RAW=toGroups(rawRows);
-  document.getElementById('fSource').value='';document.getElementById('fManager').value='';document.getElementById('fCounsellor').value='';
-  render();
-}
-
-document.getElementById('fSource').addEventListener('change',render);
-document.getElementById('fManager').addEventListener('change',()=>{document.getElementById('fCounsellor').value='';render();});
-document.getElementById('fCounsellor').addEventListener('change',render);
-document.getElementById('resetBtn').addEventListener('click',()=>{
-  document.getElementById('fSource').value='';document.getElementById('fManager').value='';document.getElementById('fCounsellor').value='';render();
-});
-document.getElementById('sampleBtn').addEventListener('click',()=>loadData(sampleData()));
-
-async function fetchSheetLive(silent){
-  try{
-    const res=await fetch(SHEET_SOURCE_URL+'&_ts='+Date.now(),{cache:'no-store'});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const text=await res.text();
-    const rows=parseCSV(text);
-    loadData(rows);
-    document.getElementById('sheetStatus').textContent='Live — last updated '+new Date().toLocaleTimeString()+' ('+rows.length+' rows)';
-    return true;
-  }catch(err){
-    if(!silent) document.getElementById('sheetStatus').textContent='Could not reach the Sheet (offline snapshot shown). '+err.message;
-    return false;
-  }
-}
-document.getElementById('sheetBtn').addEventListener('click',()=>fetchSheetLive(false));
-setInterval(()=>fetchSheetLive(true),60000); // auto-refresh every 60s
-document.getElementById('csvFile').addEventListener('change',e=>{
-  const f=e.target.files[0]; if(!f) return;
-  const reader=new FileReader();
-  reader.onload=ev=>{try{loadData(parseCSV(ev.target.result));}catch(err){alert('Could not parse CSV: '+err.message);}};
-  reader.readAsText(f);
-});
-
-loadData(SHEET_SNAPSHOT.length?SHEET_SNAPSHOT.slice():sampleData());
-fetchSheetLive(true);
-
-</script>
-</body>
-</html>
+ ST=Object.entries(tally(ROWS)).sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
+ const fS=$('fS'),fM=$('fM'),fC=$('fC'),vs=fS.value,vm=fM.value,vc=fC.value;
+ fill(fS,ROWS.map(x=>x.source),vs);fill(fM,ROWS.map(x=>x.manager),vm);
+ fill(fC,ROWS.filter(x=>!fM.value||x.manager===fM.value).map(x=>x.counsellor),vc);
+ const R=ROWS.filter(x=>(!fS.value||x.source===fS.value)&&(!fM.value||x.manager===fM.value)&&(!fC.value||x.counsellor===fC.value));
+ const m=tally(R),T=R.length,a=get(m,APP),p=get(m,PRO),e=get(m,ENR),deg=Math.min(360,pct(e,T)*3.6);
+ $('kpis').innerHTML=[['Total leads',T,'in current view'],['Applications',a,fp(pct(a,T))+' of leads'],['Prospects',p,fp(pct(p,T))+' of leads'],['Enrollments',e,fp(pct(e,T))+' of leads']]
+  .map(k=>`<div class="card kpi"><div class="l">${k[0]}</div><div class="n">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('')+
+  `<div class="card kpi hero"><div class="ring" style="background:conic-gradient(#fff ${deg}deg,rgba(255,255,255,.25) 0)"><i>${fp(pct(e,T))}</i></div><div><div class="l">Lead → Enrollment</div><div class="s">${e} of ${T}</div></div></div>`;
+ const st=[['Total leads',T],['Application Done',a],['Prospect Stage',p],['Enrollment',e]];
+ $('fun').innerHTML=st.map((s,i)=>`<div class="fr"><div class="sub">${s[0]}</div><div class="t"><b style="width:${Math.max(6,pct(s[1],T))}%">${s[1]} · ${fp(pct(s[1],T))}</b></div></div>`+(i<3?`<div class="arrow">↓ ${fp(pct(st[i+1][1],s[1]))} move to next stage</div>`:'')).join('');
+ let off=0;const C=2*Math.PI*40;
+ const arcs=ST.filter(s=>m[s]).map(s=>{const len=m[s]/T*C,x=`<circle r="40" cx="60" cy="60" fill="none" stroke="${col(s)}" stroke-width="20" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 60 60)"/>`;off+=len;return x}).join('');
+ $('don').innerHTML=T?`<svg width="150" height="150" viewBox="0 0 120 120">${arcs}<text x="60" y="58" text-anchor="middle" font-size="16" font-weight="700" fill="currentColor">${T}</text><text x="60" y="72" text-anchor="middle" font-size="8" fill="#8A817B">leads</text></svg><div class="leg">${ST.filter(s=>m[s]).map(s=>`<div><i style="background:${col(s)}"></i>${esc(s)}<span>${m[s]} · ${fp(pct(m[s],T))}</span></div>`).join('')}</div>`:'<div class="empty">No data for this filter.</div>';
+ const rowsHtml=(g,click)=>{const ks=Object.keys(g).sort((x,y)=>g[y].length-g[x].length),mx=Math.max(1,...ks.map(k=>g[k].length));
+  return ks.map(k=>{const t=tally(g[k]),n=g[k].length;return `<div class="row${click?' click':''}${click&&fM.value===k?' on':''}" data-k="${esc(k)}"><div class="nm" title="${esc(k)}">${esc(k)}</div><div><div class="trk"><b style="width:${n/mx*100}%"></b></div><div style="margin-top:5px">${seg(t,n)}</div></div><div class="chips"><span>${n}</span><span>App <em>${fp(pct(get(t,APP),n))}</em></span><span>Pros <em>${fp(pct(get(t,PRO),n))}</em></span><span>Enr <em>${fp(pct(get(t,ENR),n))}</em></span></div></div>`}).join('')||'<div class="empty">No data.</div>'};
+ $('src').innerHTML=rowsHtml(grp(R,'source'),false);$('mgr').innerHTML=rowsHtml(grp(R,'manager'),true);
+ $('mgr').querySelectorAll('.row').forEach(el=>el.onclick=()=>{fM.value=fM.value===el.dataset.k?'':el.dataset.k;fC.value='';render()});
+ const gc=grp(R,'counsellor'),cs=Object.keys(gc).sort((x,y)=>gc[y].length-gc[x].length);
+ $('cns').innerHTML='<table><tr><th>Counsellor</th><th>Manager</th><th>Leads</th><th>App %</th><th>Prospect %</th><th>Enrol %</th><th>Status split</th></tr>'+cs.map(k=>{const t=tally(gc[k]),n=gc[k].length;return `<tr><td class="nm">${esc(k)}</td><td>${esc(gc[k][0].manager)}</td><td><b>${n}</b></td><td>${fp(pct(get(t,APP),n))}</td><td>${fp(pct(get(t,PRO),n))}</td><td><span class="pill">${fp(pct(get(t,ENR),n))}</span></td><td>${seg(t,n)}</td></tr>`}).join('')+'</table>';
+ $('cleg').innerHTML=ST.map(s=>`<div><i style="background:${col(s)}"></i>${esc(s)}</div>`).join('');
+ const ins=[`${T} leads in view; ${fp(pct(a,T))} reached application, ${fp(pct(p,T))} prospect, ${fp(pct(e,T))} enrolled.`,`Application → Prospect: ${fp(pct(p,a))}. Prospect → Enrollment: ${fp(pct(e,p))}.`];
+ ST.filter(s=>![APP,PRO,ENR].some(n=>n.toLowerCase()===s.toLowerCase())&&m[s]).forEach(s=>ins.push(`${s}: ${m[s]} leads (${fp(pct(m[s],T))}).`));
+ $('ins').innerHTML=ins.map(i=>`<li>${i}</li>`).join('')}
+function load(r,msg){ROWS=r;['fS','fM','fC'].forEach(i=>$(i).value='');$('stat').textContent=msg;render()}
+async function live(silent){try{const res=await fetch(SHEET_URL+'&_='+Date.now(),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);
+ const r=toRows(await res.text());if(!r.length){if(!silent)$('stat').textContent='Sheet has no lead rows yet.';return}
+ const keep=[$('fS').value,$('fM').value,$('fC').value];ROWS=r;render();$('stat').textContent='Live · '+r.length+' leads · updated '+new Date().toLocaleTimeString()}
+ catch(e){if(!silent)$('stat').textContent='Cannot reach Sheet from here (open the downloaded file in your browser). '+e.message}}
+['fS','fC'].forEach(i=>$(i).onchange=render);$('fM').onchange=()=>{$('fC').value='';render()};
+$('rst').onclick=()=>{['fS','fM','fC'].forEach(i=>$(i).value='');render()};
+$('smp').onclick=()=>load(sample(),'Sample data');$('live').onclick=()=>live(false);
+$('file').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=x=>load(toRows(x.target.result),'Uploaded: '+f.name);rd.readAsText(f)};
+load(sample(),'Sample data (connecting to Sheet…)');live(true);setInterval(()=>live(true),60000);
+</script></body></html>
